@@ -1,5 +1,6 @@
 const DeliveryPartner = require('../models/DeliveryPartner');
 const Restaurant = require('../models/Restaurant');
+const DeliveryRequest = require('../models/DeliveryRequest');
 
 const {
   calculateDistance,
@@ -35,12 +36,34 @@ const findAvailablePartnerCandidates = async (order) => {
       throw new Error('Restaurant not found');
     }
 
-    // Find available partners
+    // Find all currently available partners
     const partners = await DeliveryPartner.find({
       status: 'AVAILABLE',
     });
 
     if (partners.length === 0) {
+      return [];
+    }
+
+    // --------------------------------------------------
+    // Find partners already attempted for this order
+    // --------------------------------------------------
+
+    const previousRequests = await DeliveryRequest.find({
+      orderId: order._id,
+    }).select('deliveryPartnerId');
+
+    const attemptedPartnerIds = new Set(
+      previousRequests.map((request) => request.deliveryPartnerId.toString())
+    );
+
+    // Remove partners who have already received
+    // a request for this order
+    const untriedPartners = partners.filter(
+      (partner) => !attemptedPartnerIds.has(partner._id.toString())
+    );
+
+    if (untriedPartners.length === 0) {
       return [];
     }
 
@@ -51,8 +74,7 @@ const findAvailablePartnerCandidates = async (order) => {
 
     // --------------------------------------------------
     // Restaurant → Customer
-    // This is identical for every rider,
-    // so calculate it once.
+    // Same for every rider, so calculate once
     // --------------------------------------------------
 
     const customerDistanceKm = calculateDistance(
@@ -63,16 +85,11 @@ const findAvailablePartnerCandidates = async (order) => {
     const restaurantToCustomerMinutes = calculateTravelTime(customerDistanceKm);
 
     // Maximum acceptable difference between
-    // rider arrival and food-ready time.
-    const MAX_PICKUP_TIME_DIFFERENCE = 10;
+    // rider arrival and food-ready time
+    const MAX_LATE_ARRIVAL_MINUTES = 10;
 
-    // --------------------------------------------------
-    // Calculate each rider
-    // --------------------------------------------------
-
-    const candidates = partners
+    const candidates = untriedPartners
       .map((partner) => {
-        // Rider → Restaurant
         const distanceKm = calculateDistance(
           partner.currentLocation,
           restaurant.location
@@ -80,35 +97,25 @@ const findAvailablePartnerCandidates = async (order) => {
 
         const travelTimeMinutes = calculateTravelTime(distanceKm);
 
-        // Expected rider arrival
         const arrivalTime = new Date(
           now.getTime() + travelTimeMinutes * 60 * 1000
         );
 
-        // Absolute difference between
-        // rider arrival and food-ready time
-        const timeDifferenceMinutes =
-          Math.abs(arrivalTime.getTime() - foodReadyAt.getTime()) / 60000;
-
-        // How long rider waits for food
         const waitingTimeMinutes =
           arrivalTime < foodReadyAt
             ? (foodReadyAt.getTime() - arrivalTime.getTime()) / 60000
             : 0;
 
-        // How late rider arrives
         const lateArrivalMinutes =
           arrivalTime > foodReadyAt
             ? (arrivalTime.getTime() - foodReadyAt.getTime()) / 60000
             : 0;
 
-        // How many minutes remain until food is ready
         const timeUntilFoodReadyMinutes = Math.max(
           0,
           (foodReadyAt.getTime() - now.getTime()) / 60000
         );
 
-        // Estimated customer delivery time
         const customerEtaMinutes =
           Math.max(travelTimeMinutes, timeUntilFoodReadyMinutes) +
           restaurantToCustomerMinutes;
@@ -122,21 +129,13 @@ const findAvailablePartnerCandidates = async (order) => {
           lateArrivalMinutes,
           restaurantToCustomerMinutes,
           customerEtaMinutes,
-          timeDifferenceMinutes,
         };
       })
-
-      // --------------------------------------------------
-      // Keep only valid candidates
-      // --------------------------------------------------
       .filter((candidate) => {
-        return candidate.timeDifferenceMinutes <= MAX_PICKUP_TIME_DIFFERENCE;
+        return candidate.lateArrivalMinutes <= MAX_LATE_ARRIVAL_MINUTES;
       });
 
-    // --------------------------------------------------
-    // Rank candidates
-    // Lowest customer ETA = best candidate
-    // --------------------------------------------------
+    // Rank from best to worst
     candidates.sort((a, b) => a.customerEtaMinutes - b.customerEtaMinutes);
 
     return candidates;

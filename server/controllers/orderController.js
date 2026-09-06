@@ -2,6 +2,8 @@ const Order = require('../models/Order');
 const User = require('../models/User');
 const Restaurant = require('../models/Restaurant');
 
+const { startAssignment } = require('../services/assignmentService');
+
 const createOrder = async (req, res) => {
   try {
     const { customerId, restaurantId, items, deliveryAddress } = req.body;
@@ -74,13 +76,14 @@ const acceptOrder = async (req, res) => {
     const { orderId } = req.params;
     const { preparationTime } = req.body;
 
-    //check preparation time
+    // Check preparation time
     if (!preparationTime || preparationTime <= 0) {
       return res.status(400).json({
         message: 'Preparation time must be greater than 0',
       });
     }
 
+    // Find order
     const order = await Order.findById(orderId);
 
     if (!order) {
@@ -88,25 +91,53 @@ const acceptOrder = async (req, res) => {
         message: 'Order not found',
       });
     }
-    // Only PLACED orders can be accepted
+
+    // Order must still be PLACED
     if (order.status !== 'PLACED') {
       return res.status(400).json({
         message: `Order cannot be accepted because its current status is ${order.status}`,
       });
     }
 
+    // Calculate food ready time
     const foodReadyAt = new Date(Date.now() + preparationTime * 60 * 1000);
 
-    //Update the order
     order.status = 'RESTAURANT_ACCEPTED';
     order.preparationTime = preparationTime;
     order.foodReadyAt = foodReadyAt;
 
     await order.save();
 
+    // --------------------------------------------------
+    // Start delivery partner search
+    // --------------------------------------------------
+    const assignmentResult = await startAssignment(order);
+
+    if (!assignmentResult.success) {
+      return res.status(200).json({
+        message:
+          'Order accepted, but no suitable delivery partner is currently available',
+        order,
+      });
+    }
+
     res.status(200).json({
-      message: 'Order accepted successfully',
-      order,
+      message: 'Order accepted and delivery partner request sent',
+      order: assignmentResult.order,
+      deliveryRequest: assignmentResult.deliveryRequest,
+      partnerDetails: {
+        partnerId: assignmentResult.candidate.partner._id,
+
+        distanceKm: assignmentResult.candidate.distanceKm,
+
+        travelTimeMinutes: assignmentResult.candidate.travelTimeMinutes,
+
+        arrivalTime: assignmentResult.candidate.arrivalTime,
+
+        waitingTimeMinutes: assignmentResult.candidate.waitingTimeMinutes,
+
+        customerEtaMinutes: assignmentResult.candidate.customerEtaMinutes,
+      },
     });
   } catch (error) {
     console.error('Error accepting order:', error);

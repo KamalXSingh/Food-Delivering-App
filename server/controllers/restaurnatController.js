@@ -92,7 +92,44 @@ const getRestaurantOrders = async (req, res) => {
     });
   }
 };
+
+const markOrderReady = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        message: 'Order not found',
+      });
+    }
+
+    if (order.status !== 'PREPARING' && order.status !== 'RIDER_ARRIVED') {
+      return res.status(400).json({
+        message: 'Order is not in PREPARING status',
+      });
+    }
+
+    order.status = 'READY_FOR_PICKUP';
+
+    await order.save();
+
+    res.status(200).json({
+      message: 'Order marked as ready for pickup',
+      order,
+    });
+  } catch (error) {
+    console.error('Error marking order ready:', error);
+
+    res.status(500).json({
+      message: 'Failed to mark order as ready',
+    });
+  }
+};
+
 module.exports = {
   createRestaurant,
   getRestaurantOrders,
+  markOrderReady,
 };

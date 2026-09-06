@@ -2,6 +2,8 @@ const DeliveryRequest = require('../models/DeliveryRequest');
 const Order = require('../models/Order');
 const DeliveryPartner = require('../models/DeliveryPartner');
 
+const { handleRequestRejection } = require('../services/assignmentService');
+
 //create a Delivery Request
 
 const createDeliveryRequest = async (req, res) => {
@@ -123,23 +125,22 @@ const acceptDeliveryRequest = async (req, res) => {
     const request = await DeliveryRequest.findById(requestId);
 
     if (!request) {
-      res.status(404).json({
-        message: 'Delivery Request not found',
+      return res.status(404).json({
+        message: 'Delivery request not found',
       });
     }
 
-    // Request must still be pending
     if (request.status !== 'PENDING') {
       return res.status(400).json({
-        message: 'This delivery request is no longer available',
+        message: 'Delivery request is no longer pending',
       });
     }
 
-    //Check expiratoin
-    if (new Date() > request.expiresAt) {
-      request.status = 'EXPIRED';
-      request.respondedAt = new Date();
+    const now = new Date();
 
+    if (now > request.expiresAt) {
+      request.status = 'EXPIRED';
+      request.respondedAt = now;
       await request.save();
 
       return res.status(400).json({
@@ -147,20 +148,6 @@ const acceptDeliveryRequest = async (req, res) => {
       });
     }
 
-    const partner = await DeliveryPartner.findById(request.deliveryPartnerId);
-
-    if (!partner) {
-      return res.status(404).json({
-        message: 'Delivery partner not found',
-      });
-    }
-
-    request.status = 'ACCEPTED';
-    request.respondedAt = new Date();
-
-    await request.save();
-
-    //Assing partner to order
     const order = await Order.findById(request.orderId);
 
     if (!order) {
@@ -169,28 +156,42 @@ const acceptDeliveryRequest = async (req, res) => {
       });
     }
 
-    order.deliveryPartnerId = request.deliveryPartnerId;
+    const deliveryPartner = await DeliveryPartner.findById(
+      request.deliveryPartnerId
+    );
 
+    if (!deliveryPartner) {
+      return res.status(404).json({
+        message: 'Delivery partner not found',
+      });
+    }
+
+    // Update delivery request
+    request.status = 'ACCEPTED';
+    request.respondedAt = now;
+    await request.save();
+
+    // Update order
+    order.deliveryPartnerId = deliveryPartner._id;
     order.status = 'PREPARING';
     await order.save();
 
-    //Partner is now delivering this order
-    partner.status = 'DELIVERING';
-    partner.currentOrder = order._id;
-    partner.availableAt = null;
+    // Update delivery partner
+    deliveryPartner.status = 'DELIVERING';
+    deliveryPartner.currentOrder = order._id;
+    deliveryPartner.availableAt = null;
+    await deliveryPartner.save();
 
-    await partner.save();
-
-    res.status(200).json({
+    return res.status(200).json({
       message: 'Delivery request accepted successfully',
       request,
       order,
-      partner,
+      deliveryPartner,
     });
   } catch (error) {
     console.error('Error accepting delivery request:', error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: 'Failed to accept delivery request',
     });
   }
@@ -220,17 +221,35 @@ const rejectDeliveryRequest = async (req, res) => {
 
     await request.save();
 
-    // Make the rider available again
-    const partner = await DeliveryPartner.findById(request.deliveryPartnerId);
+    // Let the assignment service handle the next step
+    const assignmentResult = await handleRequestRejection(request);
 
-    if (partner) {
-      partner.status = 'AVAILABLE';
-      await partner.save();
+    if (!assignmentResult.success) {
+      return res.status(200).json({
+        message: 'Delivery request rejected',
+        request,
+        assignment: assignmentResult,
+      });
     }
 
     res.status(200).json({
-      message: 'Delivery request rejected',
+      message:
+        'Delivery request rejected. A new delivery partner request has been sent.',
       request,
+      nextRequest: assignmentResult.deliveryRequest,
+      nextPartner: {
+        partnerId: assignmentResult.candidate.partner._id,
+
+        distanceKm: assignmentResult.candidate.distanceKm,
+
+        travelTimeMinutes: assignmentResult.candidate.travelTimeMinutes,
+
+        arrivalTime: assignmentResult.candidate.arrivalTime,
+
+        waitingTimeMinutes: assignmentResult.candidate.waitingTimeMinutes,
+
+        customerEtaMinutes: assignmentResult.candidate.customerEtaMinutes,
+      },
     });
   } catch (error) {
     console.error('Error rejecting delivery request:', error);

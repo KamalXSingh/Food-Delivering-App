@@ -7,6 +7,7 @@ const {
   findAvailablePartnerCandidates,
 } = require('../services/matchingService');
 
+const { generateOtp, hashOtp } = require('../utils/otpUtils');
 // --------------------------------------------------
 // Create a delivery partner profile
 // --------------------------------------------------
@@ -168,9 +169,178 @@ const getPartnerCandidatesForOrder = async (req, res) => {
   }
 };
 
+const startPickup = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        message: 'Order not found',
+      });
+    }
+
+    if (order.status !== 'PREPARING') {
+      return res.status(400).json({
+        message: 'Order is not ready for pickup',
+      });
+    }
+
+    if (!order.deliveryPartnerId) {
+      return res.status(400).json({
+        message: 'No delivery partner is assigned to this order',
+      });
+    }
+
+    order.status = 'RIDER_GOING_TO_RESTAURANT';
+
+    await order.save();
+
+    res.status(200).json({
+      message: 'Rider started going to restaurant',
+      order,
+    });
+  } catch (error) {
+    console.error('Error starting pickup:', error);
+
+    res.status(500).json({
+      message: 'Failed to start pickup',
+    });
+  }
+};
+
+const arriveAtRestaurant = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        message: 'Order not found',
+      });
+    }
+
+    if (order.status !== 'RIDER_GOING_TO_RESTAURANT') {
+      return res.status(400).json({
+        message: 'Rider has not started going to the restaurant',
+      });
+    }
+
+    if (!order.deliveryPartnerId) {
+      return res.status(400).json({
+        message: 'No delivery partner is assigned to this order',
+      });
+    }
+
+    order.status = 'RIDER_ARRIVED';
+
+    await order.save();
+
+    res.status(200).json({
+      message: 'Rider arrived at restaurant',
+      order,
+    });
+  } catch (error) {
+    console.error('Error marking rider arrival:', error);
+
+    res.status(500).json({
+      message: 'Failed to mark rider arrival',
+    });
+  }
+};
+
+const markOrderPickedUp = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        message: 'Order Not Found',
+      });
+    }
+
+    if (order.status !== 'RIDER_ARRIVED') {
+      return res.status(400).json({
+        message: 'Rider not arrived',
+      });
+    }
+
+    if (!order.deliveryPartnerId) {
+      return res.status(400).json({
+        message: 'No delivery Partner assigned',
+      });
+    }
+
+    const otp = generateOtp();
+
+    order.deliveryOtpHash = hashOtp(otp);
+    order.otpGeneratedAt = new Date();
+    order.status = 'PICKED_UP';
+
+    await order.save();
+
+    res.status(200).json({
+      message: 'Order picked up sucessfully',
+      order,
+      deliveryOtp: otp,
+    });
+  } catch (error) {
+    console.error('Error making the pickup', error);
+
+    res.status(500).json({
+      message: 'Failed to mark order as picked Up',
+    });
+  }
+};
+
+const startDelivery = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        message: 'Order not found',
+      });
+    }
+    if (order.status !== 'PICKED_UP') {
+      return res.status(400).json({
+        message: 'Order has not been picked up',
+      });
+    }
+
+    if (!order.deliveryPartnerId) {
+      return res.status(400).json({
+        message: 'No delivery partner assigned',
+      });
+    }
+
+    order.status = 'OUT_FOR_DELIVERY';
+    await order.save();
+
+    res.status(200).json({
+      message: 'Order out for delivery',
+      order,
+    });
+  } catch (error) {
+    console.error('Error starting Delivery', error);
+
+    res.status(500).json({
+      message: 'Failed to start delivery',
+    });
+  }
+};
+
 module.exports = {
   createDeliveryPartner,
   getAvailablePartners,
   findBestPartnerForOrder,
   getPartnerCandidatesForOrder,
+  startPickup,
+  arriveAtRestaurant,
+  markOrderPickedUp,
+  startDelivery,
 };

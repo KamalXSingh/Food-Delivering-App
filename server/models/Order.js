@@ -126,6 +126,15 @@ const OrderSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    partnerSearchStartedAt: {
+      type: Date,
+      default: null,
+    },
+
+    partnerSearchDeadline: {
+      type: Date,
+      default: null,
+    },
 
     deliveryOtpHash: {
       type: String,
