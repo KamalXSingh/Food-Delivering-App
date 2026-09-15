@@ -8,6 +8,7 @@ const {
   arriveAtRestaurant,
   markOrderPickedUp,
   startDelivery,
+  verifyDeliveryOtp,
 } = require('../controllers/deliveryPartnerController');
 
 const router = express.Router();
@@ -20,5 +21,6 @@ router.patch('/orders/:orderId/start-pickup', startPickup);
 router.patch('/orders/:orderId/arrive', arriveAtRestaurant);
 router.patch('/orders/:orderId/pickup', markOrderPickedUp);
 router.patch('/orders/:orderId/start-delivery', startDelivery);
+router.patch('/orders/:orderId/verify-otp', verifyDeliveryOtp);
 
 module.exports = router;

@@ -148,7 +148,34 @@ const acceptOrder = async (req, res) => {
   }
 };
 
+const getOrderById = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId)
+      .populate('restaurantId', 'name')
+      .populate('deliveryPartnerId');
+
+    if (!order) {
+      return res.status(404).json({
+        message: 'Order not found',
+      });
+    }
+
+    res.status(200).json({
+      order,
+    });
+  } catch (error) {
+    console.error('Get order error:', error);
+
+    res.status(500).json({
+      message: 'Failed to fetch order',
+    });
+  }
+};
+
 module.exports = {
   createOrder,
   acceptOrder,
+  getOrderById,
 };

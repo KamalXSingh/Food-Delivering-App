@@ -9,6 +9,8 @@ const orderRoutes = require('./routes/orderRoutes');
 const deliveryPartnerRoutes = require('./routes/deliveryPartnerRoutes');
 const deliveryRequestRoutes = require('./routes/deliveryRequestRoutes');
 
+const { processExpiredRequests } = require('./services/requestExpiryService');
+
 const app = express();
 
 app.use(cors());
@@ -29,12 +31,16 @@ const PORT = 3000;
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
-    console.log('MongoDB connected Sucesfully');
+    console.log('MongoDB connected successfully');
+
+    app.listen(process.env.PORT, () => {
+      console.log(`Server is running on PORT ${process.env.PORT}`);
+
+      setInterval(() => {
+        processExpiredRequests();
+      }, 10000);
+    });
   })
   .catch((error) => {
-    console.log('MongoDB connection failed: ', error);
+    console.error('MongoDB connection failed:', error);
   });
-
-app.listen(PORT, () => {
-  console.log(`Server is running on PORT: ${PORT}`);
-});

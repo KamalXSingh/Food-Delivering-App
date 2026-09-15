@@ -23,17 +23,17 @@ const startAssignment = async (order) => {
       )
     );
 
-    //make the changes
+    // Make the changes
     order.status = 'SEARCHING_FOR_PARTNER';
     order.partnerSearchStartedAt = now;
     order.partnerSearchDeadline = searchDeadline;
 
     await order.save();
 
-    //find the partners
+    // Find the partners
     const candidates = await findAvailablePartnerCandidates(order);
 
-    //if no candidate found
+    // If no candidate found
     if (candidates.length === 0) {
       return {
         success: false,
@@ -41,12 +41,15 @@ const startAssignment = async (order) => {
       };
     }
 
-    //select the pass the best candidate
+    // Select the best candidate
     const candidate = candidates[0];
 
-    //now we have found the best candidate now create a delivery_request
-    // we need 2 additional fields for delivery_request sentAt, and expiresAt
+    // Calculate estimated delivery time
+    const estimatedDeliveryTime = new Date(
+      now.getTime() + candidate.customerEtaMinutes * 60 * 1000
+    );
 
+    // Create delivery request
     const sentAt = new Date();
     const expiersAt = new Date(sentAt.getTime() + 60 * 1000);
 
@@ -62,6 +65,7 @@ const startAssignment = async (order) => {
     await candidate.partner.save();
 
     order.status = 'PARTNER_REQUESTED';
+    order.estimatedDeliveryTime = estimatedDeliveryTime;
 
     await order.save();
 
@@ -98,7 +102,7 @@ const handleRequestRejection = async (request) => {
       await rejectedPartner.save();
     }
 
-    // Check whether the 10-minute search window has expired
+    // Check whether the search window has expired
     const now = new Date();
 
     if (order.partnerSearchDeadline && now >= order.partnerSearchDeadline) {
@@ -125,6 +129,12 @@ const handleRequestRejection = async (request) => {
     // Pick the next best candidate
     const candidate = candidates[0];
 
+    // Recalculate estimated delivery time
+    // based on the new candidate
+    const estimatedDeliveryTime = new Date(
+      now.getTime() + candidate.customerEtaMinutes * 60 * 1000
+    );
+
     // Create a new request
     const sentAt = new Date();
 
@@ -150,6 +160,7 @@ const handleRequestRejection = async (request) => {
 
     // Update order
     order.status = 'PARTNER_REQUESTED';
+    order.estimatedDeliveryTime = estimatedDeliveryTime;
 
     await order.save();
 

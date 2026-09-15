@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 
 const User = require('../models/User');
+const Order = require('../models/Order');
 
 const createUser = async (req, res) => {
   try {
@@ -47,6 +48,36 @@ const createUser = async (req, res) => {
   }
 };
 
+const getCustomerOrders = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+
+    const customer = await User.findById(customerId);
+
+    if (!customer) {
+      return res.status(404).json({
+        message: 'Customer not found',
+      });
+    }
+
+    const orders = await Order.find({ customerId })
+      .populate('restaurantId', 'name')
+      .populate('deliveryPartnerId')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      orders,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: 'Failed to fetch customer orders',
+    });
+  }
+};
+
 module.exports = {
   createUser,
+  getCustomerOrders,
 };

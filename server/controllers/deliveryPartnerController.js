@@ -2,6 +2,8 @@ const DeliveryPartner = require('../models/DeliveryPartner');
 const User = require('../models/User');
 const Order = require('../models/Order');
 
+const crypto = require('crypto');
+
 const {
   findBestAvailablePartner,
   findAvailablePartnerCandidates,
@@ -334,6 +336,90 @@ const startDelivery = async (req, res) => {
   }
 };
 
+const verifyDeliveryOtp = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { otp } = req.body;
+
+    if (!otp) {
+      return res.status(400).json({
+        message: 'OTP is required',
+      });
+    }
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        message: 'Order not found',
+      });
+    }
+
+    if (order.status !== 'OUT_FOR_DELIVERY') {
+      return res.status(400).json({
+        message: 'Order is not out for delivery',
+      });
+    }
+
+    if (!order.deliveryPartnerId) {
+      return res.status(400).json({
+        message: 'No delivery partner is assigned to this order',
+      });
+    }
+
+    if (!order.deliveryOtpHash) {
+      return res.status(400).json({
+        message: 'Delivery OTP has not been generated',
+      });
+    }
+
+    const hashedOtp = crypto
+      .createHash('sha256')
+      .update(otp.toString())
+      .digest('hex');
+
+    if (hashedOtp !== order.deliveryOtpHash) {
+      return res.status(400).json({
+        message: 'Invalid delivery OTP',
+      });
+    }
+
+    const deliveryPartner = await DeliveryPartner.findById(
+      order.deliveryPartnerId
+    );
+
+    if (!deliveryPartner) {
+      return res.status(404).json({
+        message: 'Delivery partner not found',
+      });
+    }
+
+    const now = new Date();
+
+    order.status = 'DELIVERED';
+    order.otpVerifiedAt = now;
+
+    deliveryPartner.status = 'AVAILABLE';
+    deliveryPartner.currentOrder = null;
+    deliveryPartner.availableAt = now;
+
+    await order.save();
+    await deliveryPartner.save();
+
+    res.status(200).json({
+      message: 'Order delivered successfully',
+      order,
+      deliveryPartner,
+    });
+  } catch (error) {
+    console.error('Error verifying delivery OTP:', error);
+
+    res.status(500).json({
+      message: 'Failed to verify delivery OTP',
+    });
+  }
+};
+
 module.exports = {
   createDeliveryPartner,
   getAvailablePartners,
@@ -343,4 +429,5 @@ module.exports = {
   arriveAtRestaurant,
   markOrderPickedUp,
   startDelivery,
+  verifyDeliveryOtp,
 };
