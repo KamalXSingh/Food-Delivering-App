@@ -51,7 +51,7 @@ const startAssignment = async (order) => {
 
     // Create delivery request
     const sentAt = new Date();
-    const expiersAt = new Date(sentAt.getTime() + 60 * 1000);
+    const expiersAt = new Date(sentAt.getTime() + 600 * 1000);
 
     const deliveryRequest = await DeliveryRequest.create({
       orderId: order._id,

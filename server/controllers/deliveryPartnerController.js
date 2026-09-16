@@ -72,6 +72,46 @@ const createDeliveryPartner = async (req, res) => {
   }
 };
 
+const getCurrentOrder = async (req, res) => {
+  try {
+    const { partnerId } = req.params;
+
+    const partner = await DeliveryPartner.findById(partnerId);
+
+    if (!partner) {
+      return res.status(404).json({
+        message: 'Delivery partner not found',
+      });
+    }
+
+    if (!partner.currentOrder) {
+      return res.status(200).json({
+        order: null,
+      });
+    }
+
+    const order = await Order.findById(partner.currentOrder).populate(
+      'restaurantId',
+      'name'
+    );
+
+    if (!order) {
+      return res.status(404).json({
+        message: 'Current order not found',
+      });
+    }
+
+    res.status(200).json({
+      order,
+    });
+  } catch (error) {
+    console.error('Get current order error:', error);
+
+    res.status(500).json({
+      message: 'Failed to fetch current order',
+    });
+  }
+};
 // --------------------------------------------------
 // Get all currently AVAILABLE partners
 // --------------------------------------------------
@@ -430,4 +470,5 @@ module.exports = {
   markOrderPickedUp,
   startDelivery,
   verifyDeliveryOtp,
+  getCurrentOrder,
 };
