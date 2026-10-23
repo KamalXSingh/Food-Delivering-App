@@ -50,10 +50,49 @@ app.set('io', io);
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
+  //Handle client subsribing to an order
+  socket.on('join-order', (orderId) => {
+    console.log('Received join-order event:', orderId);
+    if (typeof orderId !== 'string') {
+      return;
+    }
+
+    const roomName = `order:${orderId}`;
+
+    socket.join(roomName);
+    console.log(`${socket.id} joined ${roomName}`);
+  });
+
+  //Handle client leaving the room
+  socket.on('leave-order', (orderId) => {
+    if (typeof orderId !== 'string') {
+      return;
+    }
+
+    socket.leave(`order:${orderId}`);
+  });
+
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
   });
+  socket.on('join-restaurant', (restaurantId) => {
+    if (typeof restaurantId !== 'string') return;
+
+    const roomName = `restaurant:${restaurantId}`;
+
+    socket.join(roomName);
+
+    console.log(`Socket ${socket.id} joined ${roomName}`);
+  });
+
+  socket.on('leave-restaurant', (restaurantId) => {
+    if (typeof restaurantId !== 'string') return;
+
+    socket.leave(`restaurant:${restaurantId}`);
+  });
 });
+
+//rooms for each restaurant
 
 // Connect MongoDB, then start the server
 mongoose

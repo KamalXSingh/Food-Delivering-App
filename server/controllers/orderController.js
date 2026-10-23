@@ -58,6 +58,15 @@ const createOrder = async (req, res) => {
       status: 'PLACED',
     });
 
+    const io = req.app.get('io');
+
+    if (io) {
+      io.to(`restaurant:${order.restaurantId.toString()}`).emit('new-order', {
+        restaurantId: order.restaurantId.toString(),
+        orderId: order._id.toString(),
+      });
+    }
+
     res.status(201).json({
       message: 'Order created sucesfully',
       order,
@@ -112,6 +121,11 @@ const acceptOrder = async (req, res) => {
     // Start delivery partner search
     // --------------------------------------------------
     const assignmentResult = await startAssignment(order);
+
+    const io = req.app.get('io');
+    io.to(`order:${order._id}`).emit('order:updated', {
+      orderId: order._id.toString(),
+    });
 
     if (!assignmentResult.success) {
       return res.status(200).json({
