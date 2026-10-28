@@ -120,9 +120,10 @@ const acceptOrder = async (req, res) => {
     // --------------------------------------------------
     // Start delivery partner search
     // --------------------------------------------------
-    const assignmentResult = await startAssignment(order);
-
     const io = req.app.get('io');
+
+    const assignmentResult = await startAssignment(order, io);
+
     io.to(`order:${order._id}`).emit('order:updated', {
       orderId: order._id.toString(),
     });

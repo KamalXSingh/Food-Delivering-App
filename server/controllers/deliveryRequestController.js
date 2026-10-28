@@ -182,6 +182,15 @@ const acceptDeliveryRequest = async (req, res) => {
     deliveryPartner.availableAt = null;
     await deliveryPartner.save();
 
+    //Notify the customer that the order has been updated
+    const io = req.app.get('io');
+
+    if (io) {
+      io.to(`order:${order._id.toString()}`).emit('order:updated', {
+        orderId: order._id.toString(),
+      });
+    }
+
     return res.status(200).json({
       message: 'Delivery request accepted successfully',
       request,
@@ -222,7 +231,9 @@ const rejectDeliveryRequest = async (req, res) => {
     await request.save();
 
     // Let the assignment service handle the next step
-    const assignmentResult = await handleRequestRejection(request);
+    const io = req.app.get('io');
+
+    const assignmentResult = await handleRequestRejection(request, io);
 
     if (!assignmentResult.success) {
       return res.status(200).json({

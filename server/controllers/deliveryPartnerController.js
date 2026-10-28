@@ -223,9 +223,9 @@ const startPickup = async (req, res) => {
       });
     }
 
-    if (order.status !== 'PREPARING') {
+    if (!['PREPARING', 'READY_FOR_PICKUP'].includes(order.status)) {
       return res.status(400).json({
-        message: 'Order is not ready for pickup',
+        message: 'Order is not in a valid state to start pickup',
       });
     }
 
@@ -238,6 +238,14 @@ const startPickup = async (req, res) => {
     order.status = 'RIDER_GOING_TO_RESTAURANT';
 
     await order.save();
+
+    const io = req.app.get('io');
+
+    if (io) {
+      io.to(`order:${order._id.toString()}`).emit('order:updated', {
+        orderId: order._id.toString(),
+      });
+    }
 
     res.status(200).json({
       message: 'Rider started going to restaurant',
@@ -323,6 +331,13 @@ const markOrderPickedUp = async (req, res) => {
     order.status = 'PICKED_UP';
 
     await order.save();
+    const io = req.app.get('io');
+
+    if (io) {
+      io.to(`order:${order._id.toString()}`).emit('order:updated', {
+        orderId: order._id.toString(),
+      });
+    }
 
     res.status(200).json({
       message: 'Order picked up sucessfully',
@@ -362,6 +377,14 @@ const startDelivery = async (req, res) => {
 
     order.status = 'OUT_FOR_DELIVERY';
     await order.save();
+
+    const io = req.app.get('io');
+
+    if (io) {
+      io.to(`order:${order._id.toString()}`).emit('order:updated', {
+        orderId: order._id.toString(),
+      });
+    }
 
     res.status(200).json({
       message: 'Order out for delivery',
@@ -445,6 +468,14 @@ const verifyDeliveryOtp = async (req, res) => {
 
     await order.save();
     await deliveryPartner.save();
+
+    const io = req.app.get('io');
+
+    if (io) {
+      io.to(`order:${order._id.toString()}`).emit('order:updated', {
+        orderId: order._id.toString(),
+      });
+    }
 
     res.status(200).json({
       message: 'Order delivered successfully',

@@ -115,6 +115,14 @@ const markOrderReady = async (req, res) => {
 
     await order.save();
 
+    const io = req.app.get('io');
+
+    if (io) {
+      io.to(`order:${order._id.toString()}`).emit('order:updated', {
+        orderId: order._id.toString(),
+      });
+    }
+
     res.status(200).json({
       message: 'Order marked as ready for pickup',
       order,

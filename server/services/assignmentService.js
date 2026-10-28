@@ -10,7 +10,7 @@ const {
   findAvailablePartnerCandidates,
 } = require('../services/matchingService');
 
-const startAssignment = async (order) => {
+const startAssignment = async (order, io) => {
   try {
     const now = new Date();
 
@@ -60,6 +60,20 @@ const startAssignment = async (order) => {
       sentAt: sentAt,
       expiresAt: expiersAt,
     });
+    // const io = require('../server').io;
+
+    const partnerId = candidate.partner._id.toString();
+    const roomName = `partner:${partnerId}`;
+
+    console.log('Emitting request to partner:', partnerId);
+    console.log('Target room:', roomName);
+
+    io.to(roomName).emit('new-delivery-request', {
+      partnerId,
+      requestId: deliveryRequest._id.toString(),
+    });
+
+    console.log('new-delivery-request emitted');
 
     candidate.partner.status = 'DELIVERY_REQUESTED';
     await candidate.partner.save();
@@ -82,7 +96,7 @@ const startAssignment = async (order) => {
   }
 };
 
-const handleRequestRejection = async (request) => {
+const handleRequestRejection = async (request, io) => {
   try {
     // Find the order associated with the rejected request
     const order = await Order.findById(request.orderId);
@@ -151,6 +165,13 @@ const handleRequestRejection = async (request) => {
       status: 'PENDING',
       sentAt,
       expiresAt,
+    });
+
+    const partnerId = candidate.partner._id.toString();
+
+    io.to(`partner:${partnerId}`).emit('new-delivery-request', {
+      partnerId,
+      requestId: deliveryRequest._id.toString(),
     });
 
     // Reserve the new partner

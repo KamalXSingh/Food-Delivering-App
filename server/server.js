@@ -38,7 +38,7 @@ app.use('/api/delivery-requests', deliveryRequestRoutes);
 // Attach Socket.IO to the HTTP server
 const io = new Server(httpServer, {
   cors: {
-    origin: 'http://localhost:4200',
+    origin: ['http://localhost:4200', 'http://localhost:4001'],
     methods: ['GET', 'POST'],
   },
 });
@@ -89,6 +89,22 @@ io.on('connection', (socket) => {
     if (typeof restaurantId !== 'string') return;
 
     socket.leave(`restaurant:${restaurantId}`);
+  });
+
+  socket.on('join-partner', (partnerId) => {
+    if (typeof partnerId !== 'string') return;
+
+    const roomName = `partner:${partnerId}`;
+
+    socket.join(roomName);
+
+    console.log(`Socket ${socket.id} joined ${roomName}`);
+  });
+
+  socket.on('leave-partner', (partnerId) => {
+    if (typeof partnerId !== 'string') return;
+
+    socket.leave(`partner:${partnerId}`);
   });
 });
 
