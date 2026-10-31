@@ -174,7 +174,16 @@ const acceptDeliveryRequest = async (req, res) => {
     // Update order
     order.deliveryPartnerId = deliveryPartner._id;
     order.status = 'PREPARING';
+    order.deliveryStatus = 'PARTNER_ACCEPTED';
+
     await order.save();
+
+    console.log('After partner acceptance:', {
+      orderId: order._id,
+      status: order.status,
+      deliveryStatus: order.deliveryStatus,
+      deliveryPartnerId: order.deliveryPartnerId,
+    });
 
     // Update delivery partner
     deliveryPartner.status = 'DELIVERING';
@@ -189,6 +198,13 @@ const acceptDeliveryRequest = async (req, res) => {
       io.to(`order:${order._id.toString()}`).emit('order:updated', {
         orderId: order._id.toString(),
       });
+      // Notify the restaurant
+      io.to(`restaurant:${order.restaurantId.toString()}`).emit(
+        'order:updated',
+        {
+          orderId: order._id.toString(),
+        }
+      );
     }
 
     return res.status(200).json({

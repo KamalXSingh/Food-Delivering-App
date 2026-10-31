@@ -74,15 +74,45 @@ const createDeliveryPartner = async (req, res) => {
 
 const getCurrentOrder = async (req, res) => {
   try {
+    console.log('Partner ID received:', req.params.partnerId);
+
+    const partner = await DeliveryPartner.findById(req.params.partnerId);
+    console.log('Partner currentOrder:', partner?.currentOrder);
+
+    console.log('getCurrentOrder controller called');
     const { partnerId } = req.params;
 
-    const partner = await DeliveryPartner.findById(partnerId);
+    // const partner = await DeliveryPartner.findById(partnerId);
 
     if (!partner) {
       return res.status(404).json({
         message: 'Delivery partner not found',
       });
     }
+
+    console.log('Partner ID:', partner._id);
+    console.log('Partner currentOrder:', partner.currentOrder);
+
+    const allOrders = await Order.find(
+      {},
+      '_id status deliveryStatus deliveryPartnerId'
+    );
+
+    console.log('All existing orders:', allOrders);
+
+    // const partner = await DeliveryPartner.findById(partnerId);
+
+    console.log('Partner document:', {
+      id: partner._id,
+      currentOrder: partner.currentOrder,
+      status: partner.status,
+    });
+
+    const assignedOrders = await Order.find({
+      deliveryPartnerId: partner._id,
+    }).select('_id status deliveryStatus');
+
+    console.log('Orders assigned to this partner:', assignedOrders);
 
     if (!partner.currentOrder) {
       return res.status(200).json({
@@ -95,19 +125,27 @@ const getCurrentOrder = async (req, res) => {
       'name'
     );
 
+    const rawOrder = await Order.collection.findOne({
+      _id: partner.currentOrder,
+    });
+
+    console.log('Mongoose query result:', order);
+    console.log('Direct MongoDB query result:', rawOrder);
+    console.log('Orders collection:', await Order.collection.countDocuments());
+
     if (!order) {
       return res.status(404).json({
         message: 'Current order not found',
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       order,
     });
   } catch (error) {
     console.error('Get current order error:', error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: 'Failed to fetch current order',
     });
   }
@@ -217,6 +255,13 @@ const startPickup = async (req, res) => {
 
     const order = await Order.findById(orderId);
 
+    console.log('Before starting pickup:', {
+      orderId: order._id,
+      status: order.status,
+      deliveryStatus: order.deliveryStatus,
+      deliveryPartnerId: order.deliveryPartnerId,
+    });
+
     if (!order) {
       return res.status(404).json({
         message: 'Order not found',
@@ -229,15 +274,32 @@ const startPickup = async (req, res) => {
       });
     }
 
+    if (order.deliveryStatus !== 'PARTNER_ACCEPTED') {
+      return res.status(400).json({
+        message: 'Delivery Partner has not accepted the order',
+      });
+    }
+
     if (!order.deliveryPartnerId) {
       return res.status(400).json({
         message: 'No delivery partner is assigned to this order',
       });
     }
 
-    order.status = 'RIDER_GOING_TO_RESTAURANT';
+    order.deliveryStatus = 'RIDER_GOING_TO_RESTAURANT';
+    // order.status = 'RIDER_GOING_TO_RESTAURANT';
 
     await order.save();
+    order.deliveryStatus = 'RIDER_GOING_TO_RESTAURANT';
+
+    console.log('Attempting to save:', order.deliveryStatus);
+
+    await order.save();
+
+    console.log('Successfully saved:', {
+      status: order.status,
+      deliveryStatus: order.deliveryStatus,
+    });
 
     const io = req.app.get('io');
 
@@ -256,6 +318,7 @@ const startPickup = async (req, res) => {
 
     res.status(500).json({
       message: 'Failed to start pickup',
+      error: error.message,
     });
   }
 };
@@ -272,7 +335,7 @@ const arriveAtRestaurant = async (req, res) => {
       });
     }
 
-    if (order.status !== 'RIDER_GOING_TO_RESTAURANT') {
+    if (order.deliveryStatus !== 'RIDER_GOING_TO_RESTAURANT') {
       return res.status(400).json({
         message: 'Rider has not started going to the restaurant',
       });
@@ -284,9 +347,24 @@ const arriveAtRestaurant = async (req, res) => {
       });
     }
 
-    order.status = 'RIDER_ARRIVED';
+    order.deliveryStatus = 'RIDER_ARRIVED';
 
     await order.save();
+
+    const io = req.app.get('io');
+
+    if (io) {
+      io.to(`order:${order._id.toString()}`).emit('order:updated', {
+        orderId: order._id.toString(),
+      });
+
+      io.to(`restaurant:${order.restaurantId.toString()}`).emit(
+        'order:updated',
+        {
+          orderId: order._id.toString(),
+        }
+      );
+    }
 
     res.status(200).json({
       message: 'Rider arrived at restaurant',
@@ -306,66 +384,24 @@ const markOrderPickedUp = async (req, res) => {
     const { orderId } = req.params;
 
     const order = await Order.findById(orderId);
-    if (!order) {
-      return res.status(404).json({
-        message: 'Order Not Found',
-      });
-    }
-
-    if (order.status !== 'RIDER_ARRIVED') {
-      return res.status(400).json({
-        message: 'Rider not arrived',
-      });
-    }
-
-    if (!order.deliveryPartnerId) {
-      return res.status(400).json({
-        message: 'No delivery Partner assigned',
-      });
-    }
-
-    const otp = generateOtp();
-
-    order.deliveryOtpHash = hashOtp(otp);
-    order.otpGeneratedAt = new Date();
-    order.status = 'PICKED_UP';
-
-    await order.save();
-    const io = req.app.get('io');
-
-    if (io) {
-      io.to(`order:${order._id.toString()}`).emit('order:updated', {
-        orderId: order._id.toString(),
-      });
-    }
-
-    res.status(200).json({
-      message: 'Order picked up sucessfully',
-      order,
-      deliveryOtp: otp,
-    });
-  } catch (error) {
-    console.error('Error making the pickup', error);
-
-    res.status(500).json({
-      message: 'Failed to mark order as picked Up',
-    });
-  }
-};
-
-const startDelivery = async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    const order = await Order.findById(orderId);
 
     if (!order) {
       return res.status(404).json({
         message: 'Order not found',
       });
     }
-    if (order.status !== 'PICKED_UP') {
+
+    // Check whether the rider has arrived
+    if (order.deliveryStatus !== 'RIDER_ARRIVED') {
       return res.status(400).json({
-        message: 'Order has not been picked up',
+        message: 'Rider has not arrived',
+      });
+    }
+
+    // Check whether the restaurant has marked food ready
+    if (order.status !== 'READY_FOR_PICKUP') {
+      return res.status(400).json({
+        message: 'Food is not ready for pickup',
       });
     }
 
@@ -375,25 +411,123 @@ const startDelivery = async (req, res) => {
       });
     }
 
-    order.status = 'OUT_FOR_DELIVERY';
+    // Generate delivery OTP
+    const otp = generateOtp();
+
+    order.deliveryOtpHash = hashOtp(otp);
+    order.otpGeneratedAt = new Date();
+
+    // Update both order and delivery statuses
+    order.status = 'PICKED_UP';
+    order.deliveryStatus = 'PICKED_UP';
+
     await order.save();
 
+    // Socket.IO notifications
     const io = req.app.get('io');
 
     if (io) {
-      io.to(`order:${order._id.toString()}`).emit('order:updated', {
-        orderId: order._id.toString(),
+      const orderIdString = order._id.toString();
+
+      // Notify customer
+      io.to(`order:${orderIdString}`).emit('order:updated', {
+        orderId: orderIdString,
+      });
+
+      // Notify restaurant
+      if (order.restaurantId) {
+        io.to(`restaurant:${order.restaurantId.toString()}`).emit(
+          'order:updated',
+          {
+            orderId: orderIdString,
+          }
+        );
+      }
+    }
+
+    return res.status(200).json({
+      message: 'Order picked up successfully',
+      order,
+      deliveryOtp: otp,
+    });
+  } catch (error) {
+    console.error('Error marking order as picked up:', error);
+
+    return res.status(500).json({
+      message: 'Failed to mark order as picked up',
+    });
+  }
+};
+
+const startDelivery = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        message: 'Order not found',
       });
     }
 
-    res.status(200).json({
+    // Verify that the food has been picked up
+    if (order.status !== 'PICKED_UP') {
+      return res.status(400).json({
+        message: 'Order has not been picked up',
+      });
+    }
+
+    // Verify delivery progress
+    if (order.deliveryStatus !== 'PICKED_UP') {
+      return res.status(400).json({
+        message: 'Delivery partner has not picked up the order',
+      });
+    }
+
+    if (!order.deliveryPartnerId) {
+      return res.status(400).json({
+        message: 'No delivery partner assigned',
+      });
+    }
+
+    // Update both statuses
+    order.status = 'OUT_FOR_DELIVERY';
+    order.deliveryStatus = 'OUT_FOR_DELIVERY';
+
+    await order.save();
+
+    // Socket.IO notifications
+    const io = req.app.get('io');
+
+    if (io) {
+      const id = order._id.toString();
+
+      io.to(`order:${id}`).emit('order:updated', {
+        orderId: id,
+      });
+
+      io.to(`partner:${order.deliveryPartnerId.toString()}`).emit(
+        'order:updated',
+        { orderId: id }
+      );
+
+      if (order.restaurantId) {
+        io.to(`restaurant:${order.restaurantId.toString()}`).emit(
+          'order:updated',
+          { orderId: id }
+        );
+      }
+    }
+
+    return res.status(200).json({
       message: 'Order out for delivery',
       order,
     });
   } catch (error) {
-    console.error('Error starting Delivery', error);
+    console.error('Error starting delivery:', error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: 'Failed to start delivery',
     });
   }

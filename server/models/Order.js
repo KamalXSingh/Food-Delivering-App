@@ -111,6 +111,22 @@ const OrderSchema = new mongoose.Schema(
       ],
       default: 'PLACED',
     },
+    deliveryStatus: {
+      type: String,
+      enum: [
+        'NOT_ASSIGNED',
+        'SEARCHING_FOR_PARTNER',
+        'PARTNER_REQUESTED',
+        'PARTNER_ACCEPTED',
+        'RIDER_GOING_TO_RESTAURANT',
+        'RIDER_ARRIVED',
+        'PICKED_UP',
+        'OUT_FOR_DELIVERY',
+        'DELIVERED',
+        'CANCELED',
+      ],
+      default: 'NOT_ASSIGNED',
+    },
 
     preparationTime: {
       type: Number,

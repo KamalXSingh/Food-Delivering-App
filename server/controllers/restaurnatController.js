@@ -118,9 +118,21 @@ const markOrderReady = async (req, res) => {
     const io = req.app.get('io');
 
     if (io) {
-      io.to(`order:${order._id.toString()}`).emit('order:updated', {
-        orderId: order._id.toString(),
+      // Notify the customer
+      io.to(`order:${orderId}`).emit('order:updated', {
+        orderId,
+        status: order.status,
       });
+
+      // Notify the assigned delivery partner
+      if (order.deliveryPartnerId) {
+        const partnerId = order.deliveryPartnerId.toString();
+
+        io.to(`partner:${partnerId}`).emit('order:updated', {
+          orderId,
+          status: order.status,
+        });
+      }
     }
 
     res.status(200).json({
