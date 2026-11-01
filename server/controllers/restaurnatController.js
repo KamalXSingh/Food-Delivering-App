@@ -105,7 +105,7 @@ const markOrderReady = async (req, res) => {
       });
     }
 
-    if (order.status !== 'PREPARING' && order.status !== 'RIDER_ARRIVED') {
+    if (order.status !== 'PREPARING') {
       return res.status(400).json({
         message: 'Order is not in PREPARING status',
       });

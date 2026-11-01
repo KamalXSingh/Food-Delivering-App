@@ -159,6 +159,14 @@ const acceptDeliveryRequest = async (req, res) => {
     const deliveryPartner = await DeliveryPartner.findById(
       request.deliveryPartnerId
     );
+    if (
+      deliveryPartner.status !== 'DELIVERY_REQUESTED' ||
+      deliveryPartner.currentOrder
+    ) {
+      return res.status(400).json({
+        message: 'Delivery partner is currently unavailable',
+      });
+    }
 
     if (!deliveryPartner) {
       return res.status(404).json({

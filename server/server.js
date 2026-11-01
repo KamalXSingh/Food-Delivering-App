@@ -120,7 +120,7 @@ mongoose
       console.log(`Server is running on PORT ${PORT}`);
 
       setInterval(() => {
-        processExpiredRequests();
+        processExpiredRequests(io);
       }, 10000);
     });
   })

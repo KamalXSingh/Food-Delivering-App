@@ -552,7 +552,10 @@ const verifyDeliveryOtp = async (req, res) => {
       });
     }
 
-    if (order.status !== 'OUT_FOR_DELIVERY') {
+    if (
+      order.status !== 'OUT_FOR_DELIVERY' ||
+      order.deliveryStatus !== 'OUT_FOR_DELIVERY'
+    ) {
       return res.status(400).json({
         message: 'Order is not out for delivery',
       });
@@ -594,7 +597,9 @@ const verifyDeliveryOtp = async (req, res) => {
     const now = new Date();
 
     order.status = 'DELIVERED';
+    order.deliveryStatus = 'DELIVERED';
     order.otpVerifiedAt = now;
+    order.deliveryOtpHash = undefined;
 
     deliveryPartner.status = 'AVAILABLE';
     deliveryPartner.currentOrder = null;
@@ -606,9 +611,24 @@ const verifyDeliveryOtp = async (req, res) => {
     const io = req.app.get('io');
 
     if (io) {
-      io.to(`order:${order._id.toString()}`).emit('order:updated', {
-        orderId: order._id.toString(),
+      const id = order._id.toString();
+
+      // Notify customer
+      io.to(`order:${id}`).emit('order:updated', {
+        orderId: id,
       });
+
+      // Notify delivery partner
+      io.to(`partner:${order.deliveryPartnerId.toString()}`).emit(
+        'order:updated',
+        { orderId: id }
+      );
+
+      // Notify restaurant
+      io.to(`restaurant:${order.restaurantId.toString()}`).emit(
+        'order:updated',
+        { orderId: id }
+      );
     }
 
     res.status(200).json({

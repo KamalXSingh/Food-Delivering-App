@@ -5,22 +5,39 @@ const DeliveryPartner = require('../models/DeliveryPartner');
 const { findAvailablePartnerCandidates } = require('./matchingService');
 const { handleRequestRejection } = require('./assignmentService');
 
-const retryOrderAssignment = async (order) => {
+const retryOrderAssignment = async (order, io) => {
   try {
     const now = new Date();
 
-    // If the overall search window has expired, cancel the order
+    // 1. Check whether the overall search window has expired
     if (order.partnerSearchDeadline && now >= order.partnerSearchDeadline) {
       order.status = 'CANCELED';
+      order.deliveryStatus = 'CANCELED';
 
       await order.save();
 
       console.log(`Order ${order._id} canceled because search window expired`);
 
+      // Notify customer and restaurant
+      if (io) {
+        const payload = {
+          orderId: order._id.toString(),
+          status: order.status,
+          deliveryStatus: order.deliveryStatus,
+        };
+
+        io.to(`order:${order._id.toString()}`).emit('order:updated', payload);
+
+        io.to(`restaurant:${order.restaurantId.toString()}`).emit(
+          'order:updated',
+          payload
+        );
+      }
+
       return;
     }
 
-    // Make sure there isn't already a pending request
+    // 2. Check whether a request is already pending
     const pendingRequest = await DeliveryRequest.findOne({
       orderId: order._id,
       status: 'PENDING',
@@ -30,30 +47,34 @@ const retryOrderAssignment = async (order) => {
       return;
     }
 
-    // Find available candidates
+    // 3. Find available delivery partners
     const candidates = await findAvailablePartnerCandidates(order);
 
     if (candidates.length === 0) {
-      // Keep searching
-      order.status = 'SEARCHING_FOR_PARTNER';
+      order.deliveryStatus = 'SEARCHING_FOR_PARTNER';
 
       await order.save();
 
       return;
     }
 
-    // Select best candidate
+    // 4. Select the best candidate
     const candidate = candidates[0];
 
     const estimatedDeliveryTime = new Date(
       now.getTime() + candidate.customerEtaMinutes * 60 * 1000
     );
 
-    // Request cannot go beyond the overall search deadline
+    // 5. Set request expiry to 30 minutes,
+    // but never beyond the overall search deadline
     const expiresAt = new Date(
-      Math.min(now.getTime() + 60 * 1000, order.partnerSearchDeadline.getTime())
+      Math.min(
+        now.getTime() + 30 * 60 * 1000,
+        order.partnerSearchDeadline.getTime()
+      )
     );
 
+    // 6. Create delivery request
     const deliveryRequest = await DeliveryRequest.create({
       orderId: order._id,
       deliveryPartnerId: candidate.partner._id,
@@ -62,16 +83,40 @@ const retryOrderAssignment = async (order) => {
       expiresAt,
     });
 
-    // Reserve partner
+    // 7. Reserve the delivery partner
     candidate.partner.status = 'DELIVERY_REQUESTED';
 
     await candidate.partner.save();
 
-    // Update order
-    order.status = 'PARTNER_REQUESTED';
+    // 8. Update order delivery status
+    order.deliveryStatus = 'PARTNER_REQUESTED';
     order.estimatedDeliveryTime = estimatedDeliveryTime;
 
     await order.save();
+
+    // 9. Notify delivery partner
+    if (io) {
+      const partnerId = candidate.partner._id.toString();
+
+      io.to(`partner:${partnerId}`).emit('new-delivery-request', {
+        partnerId,
+        requestId: deliveryRequest._id.toString(),
+      });
+
+      // Notify customer and restaurant about assignment progress
+      const payload = {
+        orderId: order._id.toString(),
+        status: order.status,
+        deliveryStatus: order.deliveryStatus,
+      };
+
+      io.to(`order:${order._id.toString()}`).emit('order:updated', payload);
+
+      io.to(`restaurant:${order.restaurantId.toString()}`).emit(
+        'order:updated',
+        payload
+      );
+    }
 
     console.log(`New delivery request created for order ${order._id}`);
 
@@ -81,47 +126,42 @@ const retryOrderAssignment = async (order) => {
   }
 };
 
-const processExpiredRequests = async () => {
+const processExpiredRequests = async (io) => {
   try {
     const now = new Date();
 
-    // Find expired pending requests
+    // 1. Find expired pending requests
     const expiredRequests = await DeliveryRequest.find({
       status: 'PENDING',
       expiresAt: { $lte: now },
     });
 
     for (const request of expiredRequests) {
-      // Mark request expired
+      // 2. Mark request as expired
       request.status = 'EXPIRED';
       request.respondedAt = now;
 
       await request.save();
 
-      // Try another partner
-      const result = await handleRequestRejection(request);
+      // 3. Release previous partner and find another candidate
+      const result = await handleRequestRejection(request, io);
 
-      // If no partner is available,
-      // keep the order searching
-      if (!result.success && result.reason === 'NO_AVAILABLE_PARTNER') {
-        const order = await Order.findById(request.orderId);
-
-        if (order) {
-          order.status = 'SEARCHING_FOR_PARTNER';
-
-          await order.save();
-        }
-      }
+      console.log(
+        `Processed expired request ${request._id}:`,
+        result?.reason || 'NEXT_PARTNER_ASSIGNED'
+      );
     }
 
-    // Retry orders that are still searching
+    // 4. Find orders with active partner assignment
     const searchingOrders = await Order.find({
-      status: 'SEARCHING_FOR_PARTNER',
-      partnerSearchDeadline: { $gt: now },
+      deliveryStatus: {
+        $in: ['SEARCHING_FOR_PARTNER', 'PARTNER_REQUESTED'],
+      },
     });
 
+    // 5. Retry assignment for each order
     for (const order of searchingOrders) {
-      await retryOrderAssignment(order);
+      await retryOrderAssignment(order, io);
     }
   } catch (error) {
     console.error('Error processing expired requests:', error);

@@ -24,7 +24,7 @@ const startAssignment = async (order, io) => {
     );
 
     // Make the changes
-    order.status = 'SEARCHING_FOR_PARTNER';
+    order.deliveryStatus = 'SEARCHING_FOR_PARTNER';
     order.partnerSearchStartedAt = now;
     order.partnerSearchDeadline = searchDeadline;
 
@@ -51,14 +51,14 @@ const startAssignment = async (order, io) => {
 
     // Create delivery request
     const sentAt = new Date();
-    const expiersAt = new Date(sentAt.getTime() + 600 * 1000);
+    const expiresAt = new Date(sentAt.getTime() + 600 * 1000);
 
     const deliveryRequest = await DeliveryRequest.create({
       orderId: order._id,
       deliveryPartnerId: candidate.partner._id,
       status: 'PENDING',
       sentAt: sentAt,
-      expiresAt: expiersAt,
+      expiresAt: expiresAt,
     });
     // const io = require('../server').io;
 
@@ -78,7 +78,7 @@ const startAssignment = async (order, io) => {
     candidate.partner.status = 'DELIVERY_REQUESTED';
     await candidate.partner.save();
 
-    order.status = 'PARTNER_REQUESTED';
+    order.deliveryStatus = 'PARTNER_REQUESTED';
     order.estimatedDeliveryTime = estimatedDeliveryTime;
 
     await order.save();
@@ -113,6 +113,7 @@ const handleRequestRejection = async (request, io) => {
     // Make the rejected partner available again
     if (rejectedPartner) {
       rejectedPartner.status = 'AVAILABLE';
+      rejectedPartner.currentOrder = null;
       await rejectedPartner.save();
     }
 
@@ -120,7 +121,7 @@ const handleRequestRejection = async (request, io) => {
     const now = new Date();
 
     if (order.partnerSearchDeadline && now >= order.partnerSearchDeadline) {
-      order.status = 'CANCELED';
+      order.deliveryStatus = 'CANCELED';
 
       await order.save();
 
@@ -134,9 +135,33 @@ const handleRequestRejection = async (request, io) => {
     const candidates = await findAvailablePartnerCandidates(order);
 
     if (candidates.length === 0) {
+      order.status = 'CANCELED';
+      order.deliveryStatus = 'CANCELED';
+
+      await order.save();
+
+      if (io) {
+        const orderId = order._id.toString();
+
+        io.to(`order:${orderId}`).emit('order:updated', {
+          orderId,
+          status: order.status,
+          deliveryStatus: order.deliveryStatus,
+        });
+
+        io.to(`restaurant:${order.restaurantId.toString()}`).emit(
+          'order:updated',
+          {
+            orderId,
+            status: order.status,
+            deliveryStatus: order.deliveryStatus,
+          }
+        );
+      }
+
       return {
         success: false,
-        reason: 'NO_AVAILABLE_PARTNER',
+        reason: 'NO_AVAILABLE_PARTNER_FOUND',
       };
     }
 
@@ -180,7 +205,7 @@ const handleRequestRejection = async (request, io) => {
     await candidate.partner.save();
 
     // Update order
-    order.status = 'PARTNER_REQUESTED';
+    order.deliveryStatus = 'PARTNER_REQUESTED';
     order.estimatedDeliveryTime = estimatedDeliveryTime;
 
     await order.save();
