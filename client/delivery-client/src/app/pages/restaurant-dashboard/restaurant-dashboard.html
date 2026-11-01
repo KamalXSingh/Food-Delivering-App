@@ -1,0 +1,104 @@
+<div class="restaurant-dashboard">
+
+  <h1>Restaurant Dashboard</h1>
+
+  <p *ngIf="loading()">
+    Loading orders...
+  </p>
+
+  <p class="error" *ngIf="errorMessage()">
+    {{ errorMessage() }}
+  </p>
+
+  <div *ngIf="!loading() && orders().length === 0">
+    <p>No orders found.</p>
+  </div>
+
+  <div
+    class="order-card"
+    *ngFor="let order of orders()"
+  >
+
+    <h2>Order</h2>
+
+    <p>
+      <strong>Order ID:</strong>
+      {{ order._id }}
+    </p>
+
+    <p>
+      <strong>Status:</strong>
+      {{ order.status }}
+    </p>
+
+    <h3>Items</h3>
+
+    <div
+      class="item"
+      *ngFor="let item of order.items"
+    >
+      <span>
+        {{ item.name }} × {{ item.quantity }}
+      </span>
+
+      <span>
+        ₹{{ item.price * item.quantity }}
+      </span>
+    </div>
+
+    <h3>Delivery Address</h3>
+
+    <p>
+      {{ order.deliveryAddress.addressLine }}
+    </p>
+
+    <p>
+      {{ order.deliveryAddress.city }},
+      {{ order.deliveryAddress.state }}
+    </p>
+
+    <p>
+      {{ order.deliveryAddress.postalCode }}
+    </p>
+
+    <p>
+      <strong>Ordered:</strong>
+      {{ order.createdAt | date:'medium' }}
+    </p>
+
+    <div *ngIf="order.status === 'PLACED'">
+
+  <label>
+    Preparation Time (minutes)
+  </label>
+
+  <input
+    type="number"
+    #prepTime
+    min="1"
+    placeholder="e.g. 25"
+  >
+
+  <button
+    (click)="acceptOrder(order._id, +prepTime.value)"
+  >
+    Accept Order
+  </button>
+
+</div>
+<div
+  *ngIf="
+    order.status === 'PREPARING' ||
+    order.status === 'RIDER_ARRIVED'
+  "
+>
+  <button
+    (click)="markOrderReady(order._id)"
+  >
+    Mark Food Ready
+  </button>
+</div>
+
+  </div>
+
+</div>

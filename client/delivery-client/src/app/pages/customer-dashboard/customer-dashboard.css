@@ -1,0 +1,38 @@
+.customer-dashboard {
+  max-width: 700px;
+  margin: 40px auto;
+  padding: 20px;
+}
+
+.order-card,
+.order-status {
+  padding: 20px;
+  margin-top: 20px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  margin: 12px 0;
+}
+
+.total {
+  font-weight: bold;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 20px;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.error {
+  margin-top: 15px;
+}

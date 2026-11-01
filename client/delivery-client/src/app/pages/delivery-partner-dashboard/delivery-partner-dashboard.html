@@ -1,0 +1,144 @@
+<!-- Pending Delivery Requests -->
+<div>
+  <h2>Delivery Requests</h2>
+
+  <p *ngIf="requests().length === 0">
+    No pending delivery requests.
+  </p>
+
+  <div *ngFor="let request of requests()">
+
+    <p>
+      <strong>Request ID:</strong>
+      {{ request._id }}
+    </p>
+
+    <button (click)="acceptRequest(request._id)">
+      Accept
+    </button>
+
+    <button (click)="rejectRequest(request._id)">
+      Reject
+    </button>
+
+    <hr />
+
+  </div>
+</div>
+
+<!-- Current Delivery -->
+<div *ngIf="currentOrder()">
+
+  <h2>Current Delivery</h2>
+
+  <!-- Order ID -->
+  <p>
+    <strong>Order ID:</strong>
+    {{ currentOrder()._id }}
+  </p>
+
+  <!-- Order Status -->
+  <p>
+    <strong>Order Status:</strong>
+    {{ currentOrder().status }}
+  </p>
+
+  <!-- Delivery Status -->
+  <p>
+    <strong>Delivery Status:</strong>
+    {{ currentOrder().deliveryStatus }}
+  </p>
+
+
+  <!-- Start travelling to restaurant -->
+  <button
+    *ngIf="
+      currentOrder().status === 'READY_FOR_PICKUP' &&
+      currentOrder().deliveryStatus === 'PARTNER_ACCEPTED'
+    "
+    (click)="startPickup()"
+  >
+    Start Pickup
+  </button>
+
+
+  <!-- Mark arrival at restaurant -->
+  <button
+    *ngIf="
+      currentOrder().deliveryStatus === 'RIDER_GOING_TO_RESTAURANT'
+    "
+    (click)="arriveAtRestaurant()"
+  >
+    Arrived at Restaurant
+  </button>
+
+
+  <!-- Wait for food preparation -->
+  <p
+    *ngIf="
+      currentOrder().deliveryStatus === 'RIDER_ARRIVED' &&
+      currentOrder().status !== 'READY_FOR_PICKUP'
+    "
+  >
+    Rider has arrived. Waiting for restaurant to prepare the food.
+  </p>
+
+
+  <!-- Confirm pickup -->
+  <button
+    *ngIf="
+      currentOrder().deliveryStatus === 'RIDER_ARRIVED' &&
+      currentOrder().status === 'READY_FOR_PICKUP'
+    "
+    (click)="markOrderPickedUp()"
+  >
+    Pick Up Order
+  </button>
+
+
+  <!-- Start delivery -->
+  <button
+    *ngIf="
+      currentOrder().status === 'PICKED_UP' &&
+      currentOrder().deliveryStatus === 'PICKED_UP'
+    "
+    (click)="startDelivery()"
+  >
+    Start Delivery
+  </button>
+
+
+  <!-- Verify customer OTP -->
+  <div
+    *ngIf="
+      currentOrder().status === 'OUT_FOR_DELIVERY' &&
+      currentOrder().deliveryStatus === 'OUT_FOR_DELIVERY'
+    "
+  >
+
+    <h3>Complete Delivery</h3>
+
+    <label>Customer OTP</label>
+
+    <input
+      type="text"
+      maxlength="6"
+      [value]="otp()"
+      (input)="otp.set($any($event.target).value)"
+      placeholder="Enter 6-digit OTP"
+    />
+
+    <button
+      (click)="verifyOtp()"
+      [disabled]="otp().length !== 6"
+    >
+      Verify OTP
+    </button>
+
+    <p class="error" *ngIf="otpError()">
+      {{ otpError() }}
+    </p>
+
+  </div>
+
+</div>

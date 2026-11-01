@@ -1,0 +1,109 @@
+<div class="customer-dashboard">
+
+  <h1>Customer Dashboard</h1>
+
+  <!-- Place Order -->
+  <div class="order-card">
+
+    <h2>Your Order</h2>
+
+    <div class="item">
+      <span>Margherita Pizza × 2</span>
+      <span>₹598</span>
+    </div>
+
+    <div class="item">
+      <span>Garlic Bread × 1</span>
+      <span>₹149</span>
+    </div>
+
+    <hr>
+
+    <div class="item total">
+      <span>Total</span>
+      <span>₹747</span>
+    </div>
+
+    <button
+      (click)="placeOrder()"
+      [disabled]="loading()"
+    >
+      {{ loading() ? 'Placing Order...' : 'Place Order' }}
+    </button>
+
+    <p class="error" *ngIf="errorMessage()">
+      {{ errorMessage() }}
+    </p>
+
+  </div>
+
+
+  <!-- Current Order -->
+  <div class="order-status" *ngIf="order()">
+
+    <h2>Current Order</h2>
+
+    <p>
+      <strong>Order ID:</strong>
+      {{ order()._id }}
+    </p>
+
+    <p>
+      <strong>Status:</strong>
+      {{ order().status }}
+    </p>
+
+    <p *ngIf="order().estimatedDeliveryTime">
+      <strong>Estimated Delivery:</strong>
+      {{ order().estimatedDeliveryTime | date:'medium' }}
+    </p>
+
+  </div>
+
+
+  <!-- Order History -->
+  <div class="order-history">
+
+    <h2>Order History</h2>
+
+    <p *ngIf="orders().length === 0">
+      No orders found.
+    </p>
+
+    <div
+      class="history-card"
+      *ngFor="let currentOrder of orders()"
+      [routerLink]="['/order/',currentOrder._id]"
+      
+    >
+
+      <p>
+        <strong>Order ID:</strong>
+        {{ currentOrder._id }}
+      </p>
+
+      <p>
+        <strong>Restaurant:</strong>
+        {{ currentOrder.restaurantId?.name || 'Restaurant' }}
+      </p>
+
+      <p>
+        <strong>Status:</strong>
+        {{ currentOrder.status }}
+      </p>
+
+      <p>
+        <strong>Items:</strong>
+        {{ currentOrder.items.length }}
+      </p>
+
+      <p>
+        <strong>Ordered:</strong>
+        {{ currentOrder.createdAt | date:'medium' }}
+      </p>
+
+    </div>
+
+  </div>
+
+</div>

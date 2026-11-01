@@ -1,0 +1,80 @@
+.order-card {
+  margin-bottom: 20px;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+}
+
+/* Progress timeline */
+.order-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 50px;
+  
+}
+
+/* Connecting line */
+.order-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+
+  left: 15px;
+  top: 32px;
+  width: 2px;
+  height: 34px;
+  background: #ddd;
+}
+
+.step-number {
+  position: relative;
+  z-index: 1;
+
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #e5e5e5;
+  color: #666;
+
+  font-weight: bold;
+}
+
+/* Completed */
+.step-number.completed {
+  background: #28a745;
+  color: white;
+  font-size: 0;
+}
+
+.step-number.completed::before {
+  content: '✓';
+  font-size: 16px;
+}
+
+/* Current */
+.step-number.current {
+  background: #007bff;
+  color: white;
+}
+
+.step-label {
+  color: #777;
+}
+
+.order-step:has(.step-number.completed) .step-label {
+  color: #222;
+  font-weight: 500;
+}
+
+.order-step:has(.step-number.current) .step-label {
+  color: #007bff;
+  font-weight: bold;
+}

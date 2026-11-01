@@ -1,0 +1,147 @@
+<div class="order-details">
+
+  <h1>Order Details</h1>
+
+  <!-- Loading -->
+  <p *ngIf="loading()">
+    Loading order...
+  </p>
+
+  <!-- Error -->
+  <p *ngIf="errorMessage()">
+    {{ errorMessage() }}
+  </p>
+
+  <!-- Order -->
+  <div *ngIf="order()">
+
+    <div class="order-card">
+
+      <h2>Order Information</h2>
+
+      <p>
+        <strong>Order ID:</strong>
+        {{ order()._id }}
+      </p>
+
+      <p>
+        <strong>Status:</strong>
+        {{ order().status }}
+      </p>
+
+      <p>
+        <strong>Ordered At:</strong>
+        {{ order().createdAt | date:'medium' }}
+      </p>
+
+    </div>
+
+
+    <!-- Restaurant -->
+    <div class="order-card">
+
+      <h2>Restaurant</h2>
+
+      <p>
+        <strong>Name:</strong>
+        {{ order().restaurantId?.name || 'Restaurant' }}
+      </p>
+
+    </div>
+
+
+    <!-- Items -->
+    <div class="order-card">
+
+      <h2>Items</h2>
+
+      <div
+        class="item"
+        *ngFor="let item of order().items"
+      >
+
+        <span>
+          {{ item.name }} × {{ item.quantity }}
+        </span>
+
+        <span>
+          ₹{{ item.price * item.quantity }}
+        </span>
+
+      </div>
+
+    </div>
+
+
+    <!-- Delivery Address -->
+    <div class="order-card">
+
+      <h2>Delivery Address</h2>
+
+      <p>
+        {{ order().deliveryAddress.addressLine }}
+      </p>
+
+      <p>
+        {{ order().deliveryAddress.city }},
+        {{ order().deliveryAddress.state }}
+      </p>
+
+      <p>
+        {{ order().deliveryAddress.postalCode }}
+      </p>
+
+    </div>
+
+
+    <!-- Estimated Delivery -->
+    <div
+      class="order-card"
+      *ngIf="order().estimatedDeliveryTime"
+    >
+
+      <h2>Estimated Delivery</h2>
+
+      <p>
+        {{ order().estimatedDeliveryTime | date:'medium' }}
+      </p>
+
+    </div>
+
+
+    <!-- Order Progress -->
+<div class="order-card">
+
+  <h2>Order Progress</h2>
+
+  <div
+    class="order-step"
+    *ngFor="let step of orderSteps; let i = index"
+  >
+
+    <div
+      class="step-number"
+      [class.completed]="i < currentStepIndex()"
+      [class.current]="i === currentStepIndex()"
+    >
+      {{ i + 1 }}
+    </div>
+
+    <div class="step-label">
+      {{ step.label }}
+    </div>
+
+    
+  </div>
+  
+  
+
+</div>
+
+  
+
+  </div>
+
+  
+
+</div>
