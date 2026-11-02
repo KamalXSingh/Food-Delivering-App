@@ -68,36 +68,37 @@
 
     <div *ngIf="order.status === 'PLACED'">
 
-  <label>
-    Preparation Time (minutes)
-  </label>
+      <label>
+        Preparation Time (minutes)
+      </label>
 
-  <input
-    type="number"
-    #prepTime
-    min="1"
-    placeholder="e.g. 25"
-  >
+      <input
+        type="number"
+        #prepTime
+        min="1"
+        placeholder="e.g. 25"
+      >
 
-  <button
-    (click)="acceptOrder(order._id, +prepTime.value)"
-  >
-    Accept Order
-  </button>
+      <button
+        (click)="acceptOrder(order._id, +prepTime.value)"
+      >
+        Accept Order
+      </button>
 
-</div>
-<div
-  *ngIf="
-    order.status === 'PREPARING' ||
-    order.status === 'RIDER_ARRIVED'
-  "
->
-  <button
-    (click)="markOrderReady(order._id)"
-  >
-    Mark Food Ready
-  </button>
-</div>
+    </div>
+
+    <div
+      *ngIf="
+        order.status === 'PREPARING' ||
+        order.status === 'RIDER_ARRIVED'
+      "
+    >
+      <button
+        (click)="markOrderReady(order._id)"
+      >
+        Mark Food Ready
+      </button>
+    </div>
 
   </div>
 

@@ -1,6 +1,11 @@
 <div class="customer-dashboard">
 
-  <h1>Customer Dashboard</h1>
+  <header class="dashboard-header">
+    <p class="eyebrow">CUSTOMER PORTAL</p>
+    <h1>Customer Dashboard</h1>
+
+    <p class="subtitle">Manage your orders and track your deliveries</p>
+  </header>
 
   <!-- Place Order -->
   <div class="order-card">
@@ -25,6 +30,7 @@
     </div>
 
     <button
+    class="place-order-btn"
       (click)="placeOrder()"
       [disabled]="loading()"
     >
@@ -48,13 +54,17 @@
       {{ order()._id }}
     </p>
 
-    <p>
+    <p class="status-row">
       <strong>Status:</strong>
-      {{ order().status }}
+      <span class="status-badge"
+      [ngClass]="'status-' + order().status.toLowerCase()">
+        {{ order().status }}
+      </span>
     </p>
 
-    <p *ngIf="order().estimatedDeliveryTime">
-      <strong>Estimated Delivery:</strong>
+    <p class="estimated-delivery" *ngIf="order().estimatedDeliveryTime">
+      <span class="delivery-label">Estimated Delivery:</span>
+      <strong></strong>
       {{ order().estimatedDeliveryTime | date:'medium' }}
     </p>
 
@@ -66,9 +76,10 @@
 
     <h2>Order History</h2>
 
-    <p *ngIf="orders().length === 0">
-      No orders found.
-    </p>
+    <div class="empty-state" *ngIf="orders().length === 0">
+  <h3>No orders yet</h3>
+  <p>Your orders will appear here once you place your first order.</p>
+</div>
 
     <div
       class="history-card"
@@ -77,20 +88,27 @@
       
     >
 
-      <p>
-        <strong>Order ID:</strong>
-        {{ currentOrder._id }}
-      </p>
+<div class="history-header">
+  <div>
+    <p>
+      <strong>Order ID:</strong>
+      {{ currentOrder._id }}
+    </p>
 
-      <p>
-        <strong>Restaurant:</strong>
-        {{ currentOrder.restaurantId?.name || 'Restaurant' }}
-      </p>
+    <p>
+      <strong>Restaurant:</strong>
+      {{ currentOrder.restaurantId?.name || 'Restaurant' }}
+    </p>
+  </div>
 
-      <p>
-        <strong>Status:</strong>
-        {{ currentOrder.status }}
-      </p>
+  <span
+    class="status-badge"
+    [ngClass]="'status-' + currentOrder.status.toLowerCase()"
+  >
+    {{ currentOrder.status }}
+  </span>
+</div>
+      
 
       <p>
         <strong>Items:</strong>

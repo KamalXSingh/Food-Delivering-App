@@ -1,1 +1,23 @@
 /* You can add global styles to this file, and also import other style files */
+:root {
+  /* Brand colors */
+  --primary: #173f35;
+  --primary-light: #286b50;
+  --accent: #d99a45;
+
+  /* Background colors */
+  --background: #f7f5ef;
+  --surface: #ffffff;
+
+  /* Text colors */
+  --text-primary: #24352d;
+  --text-secondary: #7b857e;
+
+  /* Borders and shadows */
+  --border: #e8ebe5;
+  --shadow: 0 8px 30px rgba(23, 63, 53, 0.06);
+
+  /* Rounded corners */
+  --radius-card: 16px;
+  --radius-button: 10px;
+}

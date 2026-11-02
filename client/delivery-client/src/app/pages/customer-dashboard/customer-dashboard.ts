@@ -12,6 +12,8 @@ import { RouterLink } from '@angular/router';
 export class CustomerDashboard implements OnInit {
 
   customerId = '6a93e517be00af62771effd3';
+  // 6a95398b6edb8eb8fe144c50
+  // 6a93e517be00af62771effd3
   restaurantId = '6a94756eb0a997600ab4c0f9';
 
   // Signals
